@@ -1,0 +1,102 @@
+# AgentEval Skill Definition
+
+## Name
+AgentEval — Agent Evaluator for Agentforce
+
+## Version
+0.2.0 — Phase 1: Static Config Analysis (17-agent validated, precise fix guidance)
+
+## Purpose
+
+AgentEval evaluates Agentforce agent configurations against a rubric derived from
+Salesforce platform documentation, Salesforce Well-Architected principles, and
+confirmed empirical observations across real agent deployments.
+
+It produces a ranked health report — before any tests are run, before any agent
+is invoked.
+
+## Capabilities (Phase 1)
+
+- config-analysis: enabled
+- behavioral-evaluation: disabled (Phase 2)
+- live-trace-evaluation: disabled (Phase 3)
+
+## Agent Types Supported
+
+Validated across 17 agents in 3 orgs:
+
+- Chat / messaging agents (CustomerWebClient, Messaging surfaces)
+- Voice agents (Einstein Conversation Intelligence, Omni-Channel Voice, PSTN)
+- Escalation-heavy agents (human handoff, transfer routing, Omni-Channel queues)
+- Analytics and data agents (multi-topic, data action binding)
+- Sales agents (high action count, Slack integration, CRM operations)
+- Sales coaching agents
+- Employee service agents
+- Partner operations agents
+- Automation / flow agents (single-topic, action-only)
+- Lead generation agents (multi-step, calendar integration)
+
+## Input Contract
+
+| Input | How provided | Required |
+|---|---|---|
+| Org alias | `--org` flag | yes |
+| Agent API name | `--agent` flag | yes (or use --list-agents) |
+
+No XML files. No credentials in chat. No manual metadata retrieval.
+
+## What It Retrieves
+
+- `GenAiPlannerBundle` — planner instructions, topic links, global actions
+- `GenAiPlugin` (per topic) — topic scope, action bindings, step instructions
+- Omni-Channel routing configuration (voice and chat surface)
+- Einstein Bot / Voice configuration (if present)
+
+All retrieval via `sf project retrieve`. Read-only. No org writes.
+
+## Output Contract
+
+A markdown report with two sections:
+
+1. Traffic light summary — one row per check dimension, scannable in 30 seconds
+2. Ranked findings — ordered by severity (Critical → High → Medium → Low)
+
+Each finding includes:
+- Exact config location (file + field path)
+- Observed value
+- Expected value
+- Impact on runtime behavior
+- Precise fix instruction with exact Salesforce UI navigation path OR CLI commands
+- Direct link to relevant Salesforce documentation page
+
+Fix instructions distinguish:
+- UI-fixable: exact Setup → Agents → Agent Builder → Tab → Field navigation
+- Metadata-only: step-by-step CLI retrieve → edit → deploy sequence
+- Hybrid: UI verification steps + CLI fix where UI is insufficient
+
+## Severity Levels
+
+| Level | Meaning |
+|---|---|
+| Critical | Will cause test failure or runtime error. Fix before testing. |
+| High | Will degrade agent behavior. Likely output_validation failure. |
+| Medium | Reduces quality or increases risk. Worth fixing before go-live. |
+| Low | Best practice gap. Low immediate impact. |
+
+## Rubric Authority
+
+Rules are defined in `knowledge/`. Two files:
+
+- `rubric_platform_mechanics.md` — Salesforce-sourced rules, citable to docs
+- `rubric_design_quality.md` — empirical rules, confirmed across 3+ real agents
+
+Rules are updated by maintainers, not generated at runtime. The rubric does not
+change between runs against the same agent version.
+
+## What This Skill Does Not Do
+
+- Execute test cases (Phase 2)
+- Evaluate agent responses (Phase 2)
+- Analyze live production conversations (Phase 3)
+- Write to the org
+- Store or transmit org data

@@ -1,0 +1,9 @@
+# Real evaluation reports — never commit these, they contain org config data
+outputs/*.md
+!outputs/EXAMPLE_REPORT.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
