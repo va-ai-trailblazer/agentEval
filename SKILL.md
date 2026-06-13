@@ -4,7 +4,7 @@
 AgentEval — Agent Evaluator for Agentforce
 
 ## Version
-0.2.0 — Phase 1: Static Config Analysis (17-agent validated, precise fix guidance)
+0.3.0 — Phase 1: Static Config Analysis + Well-Architected Pattern Catalogue (17-agent validated, precise fix guidance, citable patterns)
 
 ## Purpose
 
@@ -85,13 +85,33 @@ Fix instructions distinguish:
 
 ## Rubric Authority
 
-Rules are defined in `knowledge/`. Two files:
+Rules are defined in `knowledge/`. Three files:
 
 - `rubric_platform_mechanics.md` — Salesforce-sourced rules, citable to docs
 - `rubric_design_quality.md` — empirical rules, confirmed across 3+ real agents
+- `agentforce_well_architected.md` — pattern catalogue (added v0.3.0). 26+ named, stable-ID patterns across 9 categories: Authorization, Grounding, Trust/Privacy, Routing, Action Design, Instructions, Surfaces, Escalation, Lifecycle. Every finding produced by AgentEval should cite a pattern ID (e.g. `WA-AUTH-1`, `WA-GROUND-2`).
 
 Rules are updated by maintainers, not generated at runtime. The rubric does not
 change between runs against the same agent version.
+
+## Pattern Catalogue (v0.3.0)
+
+Every finding now carries a stable pattern ID from `agentforce_well_architected.md`. This makes findings:
+
+- **Portable** — the same `WA-TRUST-3` reasoning applies to every agent, not just the one being scored.
+- **Citable** — developers look up the pattern once, learn the fix shape, and apply it across agents.
+- **Versionable** — patterns have a lifecycle: DRAFT → PROVISIONAL → STABLE → AUTHORITATIVE (cross-referenced to documented Salesforce guidance).
+
+Each pattern documents: what good looks like, anti-pattern indicators (concrete XML elements / instruction phrasings to grep for), the smallest correct fix with snippets, and a verification step.
+
+## Feedback Loop
+
+The catalogue is alive. Every evaluation grows it.
+
+- Encounter a finding with no matching pattern? Propose a new one in `agentforce_well_architected.md` with the next sequential ID in the right section, marked **DRAFT**.
+- A pattern referenced in 2+ separate evaluations earns **PROVISIONAL → STABLE** promotion.
+- A pattern cross-referenced to documented Salesforce guidance earns **STABLE → AUTHORITATIVE**.
+- Patterns can be deprecated; keep them in place with `**Deprecated:**` markers so institutional memory survives.
 
 ## What This Skill Does Not Do
 
