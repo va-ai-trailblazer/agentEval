@@ -1,13 +1,13 @@
 # Agentforce Well-Architected Pattern Catalogue
 
 **Status:** v1.0 (2026-06-12) — initial catalogue derived from the jtagents 3-agent evaluation plus standard Agentforce design guidance.
-**Authority:** This catalogue is authoritative for AgentEval scoring. Every finding produced by the evaluator should cite a pattern ID below (e.g. `WA-GROUND-1`). New findings that don't map to an existing pattern are evidence the catalogue needs to grow — see the "Feedback loop" section.
+**Authority:** This catalogue is authoritative for AgentEval scoring. Every finding produced by the evaluator should cite a pattern ID below (e.g. `AGENTFORCE-WELLARCH-GROUND-1`). New findings that don't map to an existing pattern are evidence the catalogue needs to grow — see the "Feedback loop" section.
 
 ## How to read this catalogue
 
 Every pattern follows the same shape:
 
-- **ID** — short stable identifier used in evaluation evidence (e.g. `WA-AUTH-2`)
+- **ID** — short stable identifier used in evaluation evidence (e.g. `AGENTFORCE-WELLARCH-AUTH-2`)
 - **Pattern** — what the well-architected design looks like
 - **Why** — the failure mode this prevents
 - **Anti-pattern indicators** — concrete signals (XML elements, instruction phrasings) that flag the pattern is missing
@@ -22,7 +22,7 @@ The catalogue is grouped by concern: Authorization, Grounding, Trust/Privacy, Ro
 
 ## A. Authorization & access
 
-### WA-AUTH-1 · Use rule expressions for context-bound access
+### AGENTFORCE-WELLARCH-AUTH-1 · Use rule expressions for context-bound access
 
 **Pattern.** Topics that read or write user-specific data must be gated by a `ruleExpression` evaluating context variables (e.g. `ContactId isNotEmpty`, `RunningUserAvpCode equals X`). Apply with `ruleExpressionAssignments` per topic.
 
@@ -62,7 +62,7 @@ Reference example: `Partner_Success_Agent` gates 3 of 4 topics on `Verified_Part
 
 ---
 
-### WA-AUTH-2 · Bind context variables into action inputs via `attributeMappings`
+### AGENTFORCE-WELLARCH-AUTH-2 · Bind context variables into action inputs via `attributeMappings`
 
 **Pattern.** When a topic action requires the running user's identity (ContactId, AccountId, OwnerId), inject it via `<attributeMappings>` with `mappingType=ContextVariable`. Never accept these as model-supplied parameters.
 
@@ -90,7 +90,7 @@ Reference example: `Partner_Success_Agent` gates 3 of 4 topics on `Verified_Part
 
 ---
 
-### WA-AUTH-3 · Permission sets gate the planner; rule expressions gate the topics
+### AGENTFORCE-WELLARCH-AUTH-3 · Permission sets gate the planner; rule expressions gate the topics
 
 **Pattern.** A two-layer access model: (1) a permission set (or permission set group) controls who can invoke the planner at all; (2) rule expressions inside the bundle gate individual topics within the planner. Don't conflate the two — the perm set is org-level admin, the rule expression is per-context runtime.
 
@@ -112,7 +112,7 @@ Reference example: `Partner_Success_Agent` gates 3 of 4 topics on `Verified_Part
 
 ## B. Grounding & anti-hallucination
 
-### WA-GROUND-1 · Planner-level grounding rule
+### AGENTFORCE-WELLARCH-GROUND-1 · Planner-level grounding rule
 
 **Pattern.** Every planner has at least one instruction (at planner or per-topic level, applied uniformly) that constrains responses to evidence returned by actions in the current turn. Forbid invention of dollar values, dates, names, percentages, statistics, and quotations.
 
@@ -143,7 +143,7 @@ Reference example: `Territory_Intelligence_Copilot_v19` applies the same groundi
 
 ---
 
-### WA-GROUND-2 · Distinguish measured from field-reported sources
+### AGENTFORCE-WELLARCH-GROUND-2 · Distinguish measured from field-reported sources
 
 **Pattern.** When an agent integrates multiple data sources of different verification quality (e.g. transactional CRM data vs Slack chatter), instructions must label them differently. Measured = sourced from a system of record; field-reported = sourced from chat/email/notes; inferred = derived by the agent.
 
@@ -174,7 +174,7 @@ Reference example: `Territory_Intelligence_Copilot_v19`'s CRITICAL SOURCING RULE
 
 ---
 
-### WA-GROUND-3 · Never fabricate on lookup miss
+### AGENTFORCE-WELLARCH-GROUND-3 · Never fabricate on lookup miss
 
 **Pattern.** When a lookup-style action (pricing, account lookup, knowledge search) returns empty, the agent says so plainly. No estimation, interpolation, or inference from training data.
 
@@ -203,7 +203,7 @@ Never estimate, infer, or interpolate.
 
 ## C. Trust Layer & privacy
 
-### WA-TRUST-1 · Scope and minimize on personal-corpus reads
+### AGENTFORCE-WELLARCH-TRUST-1 · Scope and minimize on personal-corpus reads
 
 **Pattern.** Plugins reading personal data (Gmail, Slack DMs, Drive, Meet transcripts, LinkedIn profiles) must declare scope (which subsets are readable), minimization (summarize, don't paste verbatim), and redaction (PII masked).
 
@@ -235,7 +235,7 @@ Adapt per source (Gmail: scope to shared mailboxes / labeled folders; Drive: sha
 
 ---
 
-### WA-TRUST-2 · Confirmation required on write actions
+### AGENTFORCE-WELLARCH-TRUST-2 · Confirmation required on write actions
 
 **Pattern.** Every action that mutates data — create, update, delete, send, post — sets `<isConfirmationRequired>true</isConfirmationRequired>`. The user explicitly confirms before the action fires.
 
@@ -264,7 +264,7 @@ Apply to `CreateCase*`, `UpdateRecord*`, `AddComment*`, `Send*`, `Delete*`.
 
 ---
 
-### WA-TRUST-3 · Don't claim compliance you can't enforce
+### AGENTFORCE-WELLARCH-TRUST-3 · Don't claim compliance you can't enforce
 
 **Pattern.** Behavioral rules with stateful enforcement (rate limits, session counters, audit logging, "exactly N per X") must be enforced in the action / flow / Apex layer, not in the model instruction. The instruction can hint, but the action is the source of truth.
 
@@ -299,7 +299,7 @@ Reference anti-pattern: `Partner_Success_Agent` Instruction11 (silent 5-case-per
 
 ## D. Routing & topic design
 
-### WA-ROUTE-1 · Non-overlapping topic descriptions
+### AGENTFORCE-WELLARCH-ROUTE-1 · Non-overlapping topic descriptions
 
 **Pattern.** Each topic's `description` names its specific data source and intent in a way that does not overlap with sibling topics. The router uses descriptions as primary dispatch signal.
 
@@ -324,7 +324,7 @@ Reference example: `Territory_Intelligence_Copilot_v19`'s topic descriptions eac
 
 ---
 
-### WA-ROUTE-2 · Train with `aiPluginUtterances`
+### AGENTFORCE-WELLARCH-ROUTE-2 · Train with `aiPluginUtterances`
 
 **Pattern.** Each topic carries 5-15 representative `aiPluginUtterances` covering the variations users actually phrase. Especially required where descriptions overlap.
 
@@ -351,13 +351,13 @@ Reference example: `Territory_Intelligence_Copilot_v19`'s topic descriptions eac
 
 **Verify.** Hold out 20% of utterances; test routing accuracy on the held-out set; aim for ≥90%.
 
-**Severity.** LOW individually, but compounds with WA-ROUTE-1.
+**Severity.** LOW individually, but compounds with AGENTFORCE-WELLARCH-ROUTE-1.
 
 **Maps to.** `routing_topic_selection`.
 
 ---
 
-### WA-ROUTE-3 · Explicit routing rules in instructions for ambiguous cases
+### AGENTFORCE-WELLARCH-ROUTE-3 · Explicit routing rules in instructions for ambiguous cases
 
 **Pattern.** When an utterance form is intrinsically ambiguous (e.g. "top account" could be a ranked-superlative request OR an unmatched-account question), encode an explicit MUST-call rule in the instruction.
 
@@ -385,7 +385,7 @@ Reference example: `Territory_Intelligence_Copilot_v19`'s superlative rule.
 
 ---
 
-### WA-ROUTE-4 · Avoid action-less router topics
+### AGENTFORCE-WELLARCH-ROUTE-4 · Avoid action-less router topics
 
 **Pattern.** Every topic with `pluginType=Topic` should resolve to *some* downstream action — either its own `localActions` or an explicit handoff. Topics that exist only to "route further" can stall the planner.
 
@@ -409,9 +409,9 @@ Reference anti-pattern: `Territory_Intelligence_Copilot_v19`'s `Territory_Concie
 
 ## E. Action design
 
-### WA-ACT-1 · Idempotent reads, explicit writes
+### AGENTFORCE-WELLARCH-ACT-1 · Idempotent reads, explicit writes
 
-**Pattern.** Read actions (Get_*, List_*, Search_*) are idempotent and side-effect-free. Write actions (Create_*, Update_*, Delete_*, Send_*) carry `isConfirmationRequired=true` (see WA-TRUST-2) and return structured success/failure.
+**Pattern.** Read actions (Get_*, List_*, Search_*) are idempotent and side-effect-free. Write actions (Create_*, Update_*, Delete_*, Send_*) carry `isConfirmationRequired=true` (see AGENTFORCE-WELLARCH-TRUST-2) and return structured success/failure.
 
 **Why.** Mixed read/write actions are confusing for the planner and for users (a "Get" that mutates is a trap). Idempotent reads also make retry-on-error safe.
 
@@ -434,7 +434,7 @@ Reference anti-pattern: `Territory_Intelligence_Copilot_v19`'s `Territory_Concie
 
 ---
 
-### WA-ACT-2 · Composite actions over multi-step instructions
+### AGENTFORCE-WELLARCH-ACT-2 · Composite actions over multi-step instructions
 
 **Pattern.** Multi-step ordering ("call X before Y") is encoded in the action contract — typically by combining steps into one composite action — not in the planner instructions.
 
@@ -456,7 +456,7 @@ Reference anti-pattern: `Partner_Success_Agent`'s `IdentifyRecordsForProductPric
 
 ---
 
-### WA-ACT-3 · Schema-validated I/O
+### AGENTFORCE-WELLARCH-ACT-3 · Schema-validated I/O
 
 **Pattern.** Every action declares JSON Schema for both input and output. The schema is the contract; the planner respects it.
 
@@ -478,7 +478,7 @@ Reference anti-pattern: `Partner_Success_Agent`'s `IdentifyRecordsForProductPric
 
 ## F. Instructions & prompt design
 
-### WA-INST-1 · DRY at planner level when supported
+### AGENTFORCE-WELLARCH-INST-1 · DRY at planner level when supported
 
 **Pattern.** Cross-topic rules (grounding, sourcing, escalation) live in one canonical place — planner-level instructions or a generated single-source rule — not duplicated verbatim across topics.
 
@@ -500,7 +500,7 @@ Reference anti-pattern (acceptable trade-off): `Territory_Intelligence_Copilot_v
 
 ---
 
-### WA-INST-2 · No duplicate instructions within a topic
+### AGENTFORCE-WELLARCH-INST-2 · No duplicate instructions within a topic
 
 **Pattern.** Within a single topic's `genAiPluginInstructions` list, no two `<description>` bodies are byte-identical.
 
@@ -521,7 +521,7 @@ Reference anti-pattern: `Partner_Success_Agent` PartnerCaseManagement Instructio
 
 ---
 
-### WA-INST-3 · Instructions describe behavior, not style
+### AGENTFORCE-WELLARCH-INST-3 · Instructions describe behavior, not style
 
 **Pattern.** Instructions encode *what to do* in observable, testable terms. Style preferences ("be empathetic", "use a friendly tone") are either omitted or moved to a single style section, not interleaved with behavioral rules.
 
@@ -543,7 +543,7 @@ Reference anti-pattern: `Partner_Success_Agent` PartnerCaseManagement Instructio
 
 ## G. Surfaces & invocation
 
-### WA-SURF-1 · Declare explicit `plannerSurfaces`
+### AGENTFORCE-WELLARCH-SURF-1 · Declare explicit `plannerSurfaces`
 
 **Pattern.** Every planner declares the surface(s) it can be invoked from (`Messaging`, `CustomerWebClient`, `Slack`, `LightningPage`, headless API). Headless intent is documented even when no surface is declared.
 
@@ -578,7 +578,7 @@ Reference anti-pattern: `Territory_Intelligence_Copilot_v19` declares no `planne
 
 ## H. Escalation
 
-### WA-ESC-1 · Coherent escalation: route + capability + trigger
+### AGENTFORCE-WELLARCH-ESC-1 · Coherent escalation: route + capability + trigger
 
 **Pattern.** Escalation has three coherent parts: (1) `outboundRouteConfigs` declares where escalation goes; (2) at least one topic sets `canEscalate=true` to invoke it; (3) instructions describe the trigger condition (errors, frustration, explicit human request).
 
@@ -605,7 +605,7 @@ Reference anti-pattern: `Claude_Account_Intelligence_Agent` has `outboundRouteCo
 
 ## I. Lifecycle & operability
 
-### WA-OPS-1 · Operational hygiene plugin
+### AGENTFORCE-WELLARCH-OPS-1 · Operational hygiene plugin
 
 **Pattern.** Long-running or async agents include an operational plugin (status check, cancel, feedback submit). Users have a clear path to query "is it done?" and to abort.
 
@@ -627,7 +627,7 @@ Reference example: `Claude_Account_Intelligence_Agent`'s `Status_Feedback_v3`.
 
 ---
 
-### WA-OPS-2 · UX signaling for long-running operations
+### AGENTFORCE-WELLARCH-OPS-2 · UX signaling for long-running operations
 
 **Pattern.** Actions taking longer than 30 seconds tell the user up-front: how long, how to check status, what notification will arrive.
 
@@ -654,7 +654,7 @@ Reference example: `Claude_Account_Intelligence_Agent`'s Analysis_Documents_v3 i
 
 ---
 
-### WA-OPS-3 · Versioning discipline
+### AGENTFORCE-WELLARCH-OPS-3 · Versioning discipline
 
 **Pattern.** Iterations of an agent use semantic versioning in the `DeveloperName` (e.g. `Foo_Agent_v3`). Old versions are explicitly retired before new ones go to prod. Don't ship with 19 versions in the org all named the same MasterLabel.
 
@@ -684,10 +684,10 @@ This catalogue is alive. Every evaluation should grow it.
 1. Score the agent against existing pattern IDs. Cite the pattern in `evidence` and `config_findings`.
 2. If you encounter a config issue with no matching pattern, propose a new one:
    - Draft the pattern in this file under the right section.
-   - Use the next sequential ID in that section (e.g. `WA-AUTH-4` if 1-3 already exist).
+   - Use the next sequential ID in that section (e.g. `AGENTFORCE-WELLARCH-AUTH-4` if 1-3 already exist).
    - Mark the pattern as **DRAFT** in its body until it's been observed in 2+ separate evaluations.
 3. If a pattern is too vague to enforce, refine it with an explicit anti-pattern indicator from the new finding.
-4. If a pattern conflicts with documented Salesforce guidance discovered later, version the pattern (`WA-AUTH-1.v2`) and keep `v1` as a deprecation note.
+4. If a pattern conflicts with documented Salesforce guidance discovered later, version the pattern (`AGENTFORCE-WELLARCH-AUTH-1.v2`) and keep `v1` as a deprecation note.
 
 **On every documentation refresh from Salesforce:**
 - Cross-reference released Agentforce best-practice articles against this catalogue.
@@ -707,10 +707,10 @@ For each rubric dimension in `rubric.md`, the patterns that contribute:
 | Dimension | Contributing patterns |
 |---|---|
 | Task success | (depends on runtime; not config-only scoreable) |
-| Routing / topic selection | WA-ROUTE-1, WA-ROUTE-2, WA-ROUTE-3, WA-ROUTE-4 |
-| Instruction adherence | WA-INST-1, WA-INST-2, WA-INST-3, WA-ROUTE-3 |
-| Tool/action correctness | WA-ACT-1, WA-ACT-2, WA-ACT-3, WA-AUTH-2, WA-SURF-1, WA-TRUST-2 |
-| Grounding / evidence use | WA-GROUND-1, WA-GROUND-2, WA-GROUND-3 |
-| Safety / guardrail compliance | WA-AUTH-1, WA-AUTH-2, WA-AUTH-3, WA-TRUST-1, WA-TRUST-2, WA-TRUST-3, WA-ESC-1, WA-GROUND-3 |
-| Latency / efficiency | WA-ACT-2, WA-OPS-1, WA-OPS-2 |
-| Explanation quality | WA-INST-3, WA-OPS-2 |
+| Routing / topic selection | AGENTFORCE-WELLARCH-ROUTE-1, AGENTFORCE-WELLARCH-ROUTE-2, AGENTFORCE-WELLARCH-ROUTE-3, AGENTFORCE-WELLARCH-ROUTE-4 |
+| Instruction adherence | AGENTFORCE-WELLARCH-INST-1, AGENTFORCE-WELLARCH-INST-2, AGENTFORCE-WELLARCH-INST-3, AGENTFORCE-WELLARCH-ROUTE-3 |
+| Tool/action correctness | AGENTFORCE-WELLARCH-ACT-1, AGENTFORCE-WELLARCH-ACT-2, AGENTFORCE-WELLARCH-ACT-3, AGENTFORCE-WELLARCH-AUTH-2, AGENTFORCE-WELLARCH-SURF-1, AGENTFORCE-WELLARCH-TRUST-2 |
+| Grounding / evidence use | AGENTFORCE-WELLARCH-GROUND-1, AGENTFORCE-WELLARCH-GROUND-2, AGENTFORCE-WELLARCH-GROUND-3 |
+| Safety / guardrail compliance | AGENTFORCE-WELLARCH-AUTH-1, AGENTFORCE-WELLARCH-AUTH-2, AGENTFORCE-WELLARCH-AUTH-3, AGENTFORCE-WELLARCH-TRUST-1, AGENTFORCE-WELLARCH-TRUST-2, AGENTFORCE-WELLARCH-TRUST-3, AGENTFORCE-WELLARCH-ESC-1, AGENTFORCE-WELLARCH-GROUND-3 |
+| Latency / efficiency | AGENTFORCE-WELLARCH-ACT-2, AGENTFORCE-WELLARCH-OPS-1, AGENTFORCE-WELLARCH-OPS-2 |
+| Explanation quality | AGENTFORCE-WELLARCH-INST-3, AGENTFORCE-WELLARCH-OPS-2 |

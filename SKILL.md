@@ -4,7 +4,7 @@
 AgentEval — Agent Evaluator for Agentforce
 
 ## Version
-0.3.0 — Phase 1: Static Config Analysis + Well-Architected Pattern Catalogue (17-agent validated, precise fix guidance, citable patterns)
+0.3.1 — Phase 1: Static Config Analysis + Well-Architected Pattern Catalogue (17-agent validated, precise fix guidance, citable patterns)
 
 ## Purpose
 
@@ -89,7 +89,7 @@ Rules are defined in `knowledge/`. Three files:
 
 - `rubric_platform_mechanics.md` — Salesforce-sourced rules, citable to docs
 - `rubric_design_quality.md` — empirical rules, confirmed across 3+ real agents
-- `agentforce_well_architected.md` — pattern catalogue (added v0.3.0). 26+ named, stable-ID patterns across 9 categories: Authorization, Grounding, Trust/Privacy, Routing, Action Design, Instructions, Surfaces, Escalation, Lifecycle. Every finding produced by AgentEval should cite a pattern ID (e.g. `WA-AUTH-1`, `WA-GROUND-2`).
+- `agentforce_well_architected.md` — pattern catalogue (added v0.3.0). 26+ named, stable-ID patterns across 9 categories: Authorization, Grounding, Trust/Privacy, Routing, Action Design, Instructions, Surfaces, Escalation, Lifecycle. Every finding produced by AgentEval should cite a pattern ID (e.g. `AGENTFORCE-WELLARCH-AUTH-1`, `AGENTFORCE-WELLARCH-GROUND-2`).
 
 Rules are updated by maintainers, not generated at runtime. The rubric does not
 change between runs against the same agent version.
@@ -98,7 +98,7 @@ change between runs against the same agent version.
 
 Every finding now carries a stable pattern ID from `agentforce_well_architected.md`. This makes findings:
 
-- **Portable** — the same `WA-TRUST-3` reasoning applies to every agent, not just the one being scored.
+- **Portable** — the same `AGENTFORCE-WELLARCH-TRUST-3` reasoning applies to every agent, not just the one being scored.
 - **Citable** — developers look up the pattern once, learn the fix shape, and apply it across agents.
 - **Versionable** — patterns have a lifecycle: DRAFT → PROVISIONAL → STABLE → AUTHORITATIVE (cross-referenced to documented Salesforce guidance).
 
