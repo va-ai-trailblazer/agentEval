@@ -30,6 +30,91 @@ from typing import Optional
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
+# Rule catalogue — maps rule prefix to human-readable category, and each rule
+# ID to a one-line description. Used in report rendering so viewers see
+# "Platform Mechanics 22 — Agent must have at least one topic linked"
+# instead of the bare "PM-22".
+RULE_CATEGORIES = {
+    "PM": "Platform Mechanics",
+    "DQ": "Design Quality",
+}
+
+RULE_DESCRIPTIONS = {
+    "PM-01": "Read actions should not require confirmation (writes correctly require it)",
+    "PM-07": "Voice surface requires Omni-Channel routing configuration",
+    "PM-08": "Topics with escalation instructions must have canEscalate: true",
+    "PM-11": "SEL rule must not block unauthenticated inbound voice calls",
+    "PM-12": "Voice surface must have outboundRouteConfigs defined",
+    "PM-13": "Voice escalation must include an escalation message for the caller",
+    "PM-14": "Omni-Channel flow referenced in outboundRouteConfigs must exist in org",
+    "PM-15": "A Contact Center must exist in the org for voice agents",
+    "PM-16": "Topic instruction text must not exceed 4000 character platform limit",
+    "PM-17": "Duplicate localDeveloperName across topics causes unpredictable routing",
+    "PM-18": "Action localDeveloperName must be unique within a topic",
+    "PM-19": "Voice agent actions must have progressIndicatorMessage set",
+    "PM-20": "adaptiveResponseAllowed must be true for voice/telephony surface",
+    "PM-21": "callRecordingAllowed must be explicitly set on voice surface",
+    "PM-22": "Agent must have at least one topic linked via localTopicLinks",
+    "PM-23": "Topic linked in localTopicLinks must have a matching localTopics entry",
+    "PM-24": "Action in localActionLinks must have a matching localActions entry",
+    "PM-25": "plannerType must match the deployed surface",
+    "DQ-01": "Topic trigger words must not overlap across topics",
+    "DQ-02": "Every action path must have a fallback for empty response",
+    "DQ-03": "KB action must not be in genAiFunctions of action-only topics",
+    "DQ-04": "Sensitive operations must be gated behind human escalation",
+    "DQ-05": "Planner must commit to topic before calling any action",
+    "DQ-06": "Fallback topic must ask exactly one clarifying question",
+    "DQ-10": "Topic scope must explicitly exclude adjacent topic responsibilities",
+    "DQ-11": "Escalation topic must not create an escalation loop",
+    "DQ-12": "Agent must have topics covering all intent categories in its description",
+    "DQ-13": "Topic with no actions must have a response-only scope",
+    "DQ-14": "Topic instructions must not contradict topic scope",
+}
+
+
+# Build sequential numbering within each category so viewers see
+# "Platform Mechanics 1, 2, 3..." instead of the gappy original IDs
+# (PM-01, PM-07, PM-08...). The mapping is stable: a given rule ID
+# always maps to the same sequential number across all reports.
+def _build_sequential_index() -> dict[str, int]:
+    by_category: dict[str, list[str]] = {}
+    for rid in RULE_DESCRIPTIONS.keys():
+        prefix = rid.split("-", 1)[0]
+        by_category.setdefault(prefix, []).append(rid)
+    index: dict[str, int] = {}
+    for prefix, rids in by_category.items():
+        for i, rid in enumerate(sorted(rids), start=1):
+            index[rid] = i
+    return index
+
+
+RULE_SEQUENTIAL_INDEX = _build_sequential_index()
+
+
+def format_rule_label(rule_id: str) -> str:
+    """Render a rule ID as 'Platform Mechanics 3' or 'Design Quality 7'.
+
+    Uses sequential numbering within each category so reports never
+    show gappy original IDs (e.g. PM-22 -> Platform Mechanics 15, not 22).
+    """
+    base = rule_id.split(":")[0]                     # strip any ':topic_name' suffix
+    if "-" in base:
+        prefix = base.split("-", 1)[0]
+        category = RULE_CATEGORIES.get(prefix, prefix)
+        seq = RULE_SEQUENTIAL_INDEX.get(base)
+        if seq is not None:
+            return f"{category} {seq}"
+        return category
+    return base
+
+
+def format_rule_with_desc(rule_id: str) -> str:
+    """'Platform Mechanics 3 — Agent must have at least one topic linked'."""
+    base = rule_id.split(":")[0]
+    label = format_rule_label(rule_id)
+    desc = RULE_DESCRIPTIONS.get(base)
+    return f"{label} — {desc}" if desc else label
+
 @dataclass
 class Finding:
     rule_id: str
@@ -205,8 +290,32 @@ def get_planner_surfaces(root: ET.Element) -> list[ET.Element]:
 # Rules — Platform Mechanics
 # ---------------------------------------------------------------------------
 
+def _is_write_action(action_name: str, action_label: str) -> bool:
+    """Heuristic: does this action mutate data?
+
+    Write actions: Create*, Update*, Delete*, Add*, Submit*, Send*, Insert*,
+    Patch*, Put*, Post*, Modify*, Remove*. For these, isConfirmationRequired=true
+    is the CORRECT design (matches catalogue pattern AGENTFORCE-WELLARCH-TRUST-2).
+    Read actions: Get*, List*, Search*, Find*, Lookup*, Fetch*, Retrieve*,
+    Identify*. For these, confirmation adds friction without protecting anything.
+    """
+    write_prefixes = (
+        "create", "update", "delete", "add", "submit", "send", "insert",
+        "patch", "put", "post", "modify", "remove", "register", "enroll",
+        "approve", "reject", "cancel", "schedule", "book",
+    )
+    name_lower = (action_name or "").lower()
+    label_lower = (action_label or "").lower()
+    return name_lower.startswith(write_prefixes) or label_lower.startswith(write_prefixes)
+
+
 def check_pm01_confirmation_required(root: ET.Element) -> list[CheckResult]:
-    """PM-01: isConfirmationRequired must be false for autonomous actions."""
+    """PM-01: confirmation required only when it adds friction without value.
+
+    Per catalogue pattern AGENTFORCE-WELLARCH-TRUST-2, write actions SHOULD
+    have isConfirmationRequired=true. PM-01 only flags read-style actions
+    where confirmation adds friction without preventing harm.
+    """
     results = []
     for topic in get_local_topics(root):
         topic_label = get_text(topic, "masterLabel", "unknown topic")
@@ -215,24 +324,39 @@ def check_pm01_confirmation_required(root: ET.Element) -> list[CheckResult]:
             action_name = get_text(action, "localDeveloperName", "unknown")
             confirm = get_text(action, "isConfirmationRequired", "true")
             rule_id = f"PM-01:{topic_label}:{action_name}"
+            is_write = _is_write_action(action_name, action_label)
+
+            # Write action with confirmation: correct design — pass.
+            # Write action without confirmation: catalogue WA-TRUST-2 violation
+            # (let WA-TRUST-2 surface that; PM-01 stays silent).
+            if is_write:
+                results.append(CheckResult(rule_id=rule_id, passed=True))
+                continue
+
+            # Read action with confirmation: friction without value — flag.
             if confirm.lower() == "true":
                 results.append(CheckResult(
                     rule_id=rule_id,
                     passed=False,
                     finding=Finding(
                         rule_id="PM-01",
-                        severity="critical",
-                        title=f"{topic_label}: agent will ask before acting ({action_label})",
+                        severity="medium",
+                        title=f"{topic_label}: read action requires confirmation ({action_label})",
                         location=f"GenAiPlannerBundle > {topic_label} > localActions > {action_name} > isConfirmationRequired",
                         observed="true",
-                        expected="false",
-                        impact="Agent pauses and asks user 'Would you like me to proceed?' before every action. "
-                               "Automated test runs receive a question instead of an action confirmation — output_validation fails.",
+                        expected="false (for read-style actions)",
+                        impact=(
+                            "This action looks like a read (Get/List/Search/Lookup), but it's "
+                            "configured to ask the user 'Would you like me to proceed?' before running. "
+                            "Confirmation on reads adds turn-by-turn friction without preventing any "
+                            "destructive action. Also breaks automated test runs that expect a direct "
+                            "answer. For WRITE actions (Create/Update/Delete), confirmation IS correct — "
+                            "see catalogue pattern AGENTFORCE-WELLARCH-TRUST-2."
+                        ),
                         fix=(
-                            f"UI path (recommended): Setup → Agents → [your agent] → Open in Agent Builder → "
+                            f"UI path: Setup → Agents → [your agent] → Open in Agent Builder → "
                             f"Topics tab → click '{topic_label}' → Actions section → click '{action_label}' → "
                             f"uncheck 'Require Confirmation' → Save. "
-                            f"Repeat for every action in this topic that should execute automatically. "
                             f"CLI path: retrieve bundle XML, set <isConfirmationRequired>false</isConfirmationRequired> "
                             f"under the '{action_name}' localActions block, deactivate agent, deploy, reactivate. "
                             f"Salesforce docs: https://help.salesforce.com/s/articleView?id=sf.copilot_actions_configure.htm"
@@ -356,9 +480,10 @@ def check_dq02_fallback_instructions(root: ET.Element) -> list[CheckResult]:
                     location=f"GenAiPlannerBundle > {topic_label} > genAiPluginInstructions",
                     observed="No 'if no record returned' or equivalent fallback instruction found",
                     expected="Explicit instruction for empty action response (e.g. 'If no caseRecord was returned, still confirm...')",
-                    impact="If the action returns empty (session-injected params, package dependency, or transient failure), "
-                           "the agent has no instruction — typically says 'system error' or gives no confirmation. "
-                           "output_validation fails.",
+                    impact="When the action returns empty (session-injected params missing, package dependency unavailable, "
+                           "or transient failure), the agent has no fallback instruction. The user receives a confusing "
+                           "'system error' message — or no confirmation at all — instead of a graceful response. "
+                           "Increases abandonment risk and erodes trust in the agent.",
                     fix=(
                         f"UI path: Setup → Agents → [your agent] → Open in Agent Builder → "
                         f"Topics tab → click '{topic_label}' → Instructions section → "
@@ -1681,36 +1806,123 @@ def render_report(report: HealthReport) -> str:
     medium = sum(1 for f in report.findings if f.severity == "medium")
     low = sum(1 for f in report.findings if f.severity == "low")
     passed = len(report.passed_checks)
+    failed = len(report.findings)
 
     lines.append(f"# AgentEval Health Report — {report.agent_name}")
     lines.append(f"Org: {report.org_alias}  |  Run: {report.run_timestamp}")
     lines.append("")
 
-    # Summary bar
+    # Executive Summary — what architects/leaders read first
+    lines.append("## Executive Summary")
+    lines.append("")
     if not report.findings:
-        lines.append("## Summary")
+        lines.append(f"**{report.agent_name} is healthy.** All {passed} checks passed.")
+        lines.append("No critical, high, medium, or low-severity issues found.")
+        lines.append("")
+    else:
+        # Lead sentence — calibrated to severity
+        if critical > 0:
+            lead = (f"**{report.agent_name} has critical issues that should be addressed "
+                    f"before production use.**")
+        elif high > 0:
+            lead = (f"**{report.agent_name} is functionally deployable but contains issues "
+                    f"that may degrade customer experience.**")
+        else:
+            lead = (f"**{report.agent_name} is largely healthy with minor refinements available.**")
+        lines.append(lead)
+        lines.append("")
+
+        # Severity bullets — only include non-zero buckets
+        if critical:
+            label = "issue" if critical == 1 else "issues"
+            lines.append(f"- 🔴 **{critical} critical {label}** — may block expected runtime behavior")
+        if high:
+            label = "gap" if high == 1 else "gaps"
+            lines.append(f"- 🟠 **{high} high-risk {label}** — likely to degrade customer experience")
+        if medium:
+            label = "item" if medium == 1 else "items"
+            lines.append(f"- 🟡 **{medium} medium-risk {label}** — quality concerns worth addressing")
+        if low:
+            label = "item" if low == 1 else "items"
+            lines.append(f"- 🔵 **{low} low-risk polish {label}** — refinements for routing clarity")
+        lines.append("")
+
+        # Top priorities — first 3 findings (already sorted by severity)
+        top_findings = report.findings[:3]
+        if top_findings:
+            lines.append("### Top priorities")
+            for i, f in enumerate(top_findings, start=1):
+                emoji = SEVERITY_EMOJI.get(f.severity, "⚪")
+                lines.append(f"{i}. {emoji} {f.title}")
+            lines.append("")
+
+    # Verdict — pass/fail first, then severity breakdown
+    if not report.findings:
+        lines.append("## Verdict: PASS")
         lines.append(f"✅ All {passed} checks passed — agent config looks healthy.")
     else:
-        lines.append("## Summary")
+        has_critical_or_high = critical > 0 or high > 0
+        verdict = "FAIL" if has_critical_or_high else "NEEDS ATTENTION"
+        lines.append(f"## Verdict: {verdict}")
+        lines.append(f"**{failed} failed**  |  **{passed} passed**  |  {total} total checks")
+        lines.append("")
         parts = []
-        if critical: parts.append(f"**{critical} critical**")
-        if high: parts.append(f"{high} high")
-        if medium: parts.append(f"{medium} medium")
-        if low: parts.append(f"{low} low")
-        parts.append(f"{passed} passed")
-        lines.append("  |  ".join(parts))
+        if critical: parts.append(f"🔴 {critical} critical")
+        if high: parts.append(f"🟠 {high} high")
+        if medium: parts.append(f"🟡 {medium} medium")
+        if low: parts.append(f"🔵 {low} low")
+        lines.append("Severity: " + "  ·  ".join(parts))
     lines.append("")
 
-    # Findings
+    # What Failed — quick-scan list with ❌
     if report.findings:
-        lines.append("## Issues")
+        lines.append("## What Failed")
+        lines.append("")
+        for f in report.findings:
+            emoji = SEVERITY_EMOJI.get(f.severity, "⚪")
+            label = SEVERITY_LABEL.get(f.severity, f.severity.upper())
+            rule_label = format_rule_label(f.rule_id)
+            lines.append(f"- ❌ {emoji} **{label}** · {rule_label} — {f.title}")
+        lines.append("")
+
+    # What Passed — quick-scan list with ✅ grouped by category
+    if report.passed_checks:
+        lines.append("## What Passed")
+        lines.append("")
+        rules_seen: dict[str, list[str]] = {}
+        for check_id in report.passed_checks:
+            rule = check_id.split(":")[0]
+            rules_seen.setdefault(rule, []).append(check_id)
+        by_category: dict[str, list[tuple[str, int]]] = {}
+        for rule, checks in rules_seen.items():
+            prefix = rule.split("-", 1)[0] if "-" in rule else rule
+            category = RULE_CATEGORIES.get(prefix, prefix)
+            by_category.setdefault(category, []).append((rule, len(checks)))
+        for category in sorted(by_category):
+            lines.append(f"### {category}")
+            for rule_id, count in sorted(by_category[category]):
+                desc = RULE_DESCRIPTIONS.get(rule_id, "")
+                label = format_rule_label(rule_id)
+                count_tag = f" ({count} checks)" if count > 1 else ""
+                if desc:
+                    lines.append(f"- ✅ **{label}** — {desc}{count_tag}")
+                else:
+                    lines.append(f"- ✅ **{label}**{count_tag}")
+            lines.append("")
+        lines.append("")
+
+    # Issue Details — full remediation for each finding
+    if report.findings:
+        lines.append("---")
+        lines.append("")
+        lines.append("## Issue Details")
         lines.append("")
         for f in report.findings:
             emoji = SEVERITY_EMOJI.get(f.severity, "⚪")
             label = SEVERITY_LABEL.get(f.severity, f.severity.upper())
             candidate_tag = " *(candidate rule)*" if f.candidate else ""
             lines.append(f"### {emoji} {label} — {f.title}{candidate_tag}")
-            lines.append(f"**Rule:** {f.rule_id}")
+            lines.append(f"**Rule:** {format_rule_label(f.rule_id)} ({f.rule_id})")
             lines.append(f"**Location:** `{f.location}`")
             lines.append(f"**Found:** {f.observed}")
             lines.append(f"**Expected:** {f.expected}")
@@ -1718,21 +1930,8 @@ def render_report(report: HealthReport) -> str:
             lines.append(f"**Fix:** {f.fix}")
             lines.append("")
 
-    # Passed
-    if report.passed_checks:
-        lines.append("## What Passed")
-        lines.append("")
-        # Group by rule prefix for readability
-        rules_seen: dict[str, list[str]] = {}
-        for check_id in report.passed_checks:
-            rule = check_id.split(":")[0]
-            rules_seen.setdefault(rule, []).append(check_id)
-        for rule, checks in sorted(rules_seen.items()):
-            lines.append(f"✅ {rule} ({len(checks)} check{'s' if len(checks) > 1 else ''})")
-        lines.append("")
-
     lines.append("---")
-    lines.append("*Generated by AgentEval v0.2.0 — Phase 1: Static Config Analysis*")
+    lines.append("*Generated by AgentEval v0.3.2 — Phase 1: Static Config Analysis*")
     lines.append("*Rules sourced from Salesforce platform docs, Well-Architected principles, and confirmed empirical observations.*")
 
     return "\n".join(lines)
